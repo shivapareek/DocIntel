@@ -146,25 +146,39 @@ const ChatInterface = () => {
                   </span>
                   <div className="flex-1">
                     <div className="whitespace-pre-wrap">{message.content}</div>
-                    
+
                     {message.type === 'assistant' && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                        {/* Justification */}
                         {message.justification && (
-                          <div className="mb-2">
-                            <span className="text-xs font-medium text-gray-600">📍 Reference:</span>
-                            <p className="text-xs text-gray-600 mt-1">{message.justification}</p>
+                          <div>
+                            <span className="text-xs font-medium text-gray-600">📍 Justification:</span>
+                            <p className="text-xs text-gray-700 mt-1">{message.justification}</p>
                           </div>
                         )}
-                        
-                        {message.sourceText && (
-                          <div className="bg-gray-50 p-2 rounded text-xs">
-                            <span className="font-medium text-gray-700">Source Text:</span>
-                            <p className="text-gray-600 mt-1 italic">"{message.sourceText}"</p>
+
+                        {/* Source Snippets */}
+                        {message.source_snippets && message.source_snippets.length > 0 && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-600">📚 Source Snippets:</span>
+                            <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-gray-700">
+                              {message.source_snippets.map((snippet, i) => (
+                                <li key={i} className="italic">"{snippet}"</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Confidence */}
+                        {typeof message.confidence === 'number' && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-600">🔎 Confidence:</span>
+                            <p className="text-xs text-gray-700 mt-1">{(message.confidence * 100).toFixed(1)}%</p>
                           </div>
                         )}
                       </div>
                     )}
-                    
+
                     <div className="text-xs opacity-75 mt-2">
                       {formatTime(message.timestamp)}
                     </div>
@@ -230,7 +244,6 @@ const ChatInterface = () => {
             )}
           </button>
         </form>
-        
         <div className="mt-2 text-xs text-gray-500">
           Press Enter to send, Shift+Enter for new line
         </div>

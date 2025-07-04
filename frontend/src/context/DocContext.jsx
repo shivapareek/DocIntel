@@ -17,7 +17,7 @@ export const DocumentProvider = ({ children }) => {
     fileSize: 0,
     summary: '',
     documentId: null,
-    sessionId: null,                 // ✅ Added sessionId
+    sessionId: null,
     chatHistory: [],
     challenges: [],
     currentChallenge: null,
@@ -42,7 +42,6 @@ export const DocumentProvider = ({ children }) => {
       });
 
       if (!response.ok) throw new Error('Upload failed');
-
       const data = await response.json();
 
       setDocumentState(prev => ({
@@ -52,11 +51,11 @@ export const DocumentProvider = ({ children }) => {
         fileSize: file.size,
         documentId: data.document_id,
         summary: data.summary || '',
-        sessionId: null, // reset session
-        isLoading: false,
+        sessionId: null,
         chatHistory: [],
         challenges: [],
-        userAnswers: []
+        userAnswers: [],
+        isLoading: false
       }));
 
       return data;
@@ -73,9 +72,7 @@ export const DocumentProvider = ({ children }) => {
 
   // Ask question
   const askQuestion = useCallback(async (question) => {
-    if (!documentState.isUploaded) {
-      throw new Error('Please upload a document first');
-    }
+    if (!documentState.isUploaded) throw new Error('Please upload a document first');
 
     setDocumentState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -91,7 +88,6 @@ export const DocumentProvider = ({ children }) => {
       });
 
       if (!response.ok) throw new Error('Failed to get answer');
-
       const data = await response.json();
 
       setDocumentState(prev => ({
@@ -103,6 +99,7 @@ export const DocumentProvider = ({ children }) => {
             type: 'assistant',
             content: data.answer,
             justification: data.justification,
+            source_snippets: data.source_snippets,
             sourceText: data.source_text,
             timestamp: new Date()
           }
@@ -112,20 +109,14 @@ export const DocumentProvider = ({ children }) => {
 
       return data;
     } catch (error) {
-      setDocumentState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message
-      }));
+      setDocumentState(prev => ({ ...prev, isLoading: false, error: error.message }));
       throw error;
     }
   }, [documentState.isUploaded, documentState.documentId]);
 
   // Generate challenges
   const generateChallenges = useCallback(async () => {
-    if (!documentState.isUploaded) {
-      throw new Error('Please upload a document first');
-    }
+    if (!documentState.isUploaded) throw new Error('Please upload a document first');
 
     setDocumentState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -139,13 +130,12 @@ export const DocumentProvider = ({ children }) => {
       });
 
       if (!response.ok) throw new Error('Failed to generate challenges');
-
       const data = await response.json();
 
       setDocumentState(prev => ({
         ...prev,
         challenges: data.questions || [],
-        sessionId: data.session_id,            // ✅ Store sessionId
+        sessionId: data.session_id,
         currentChallenge: 0,
         userAnswers: [],
         isLoading: false
@@ -153,20 +143,17 @@ export const DocumentProvider = ({ children }) => {
 
       return data;
     } catch (error) {
-      setDocumentState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message
-      }));
+      setDocumentState(prev => ({ ...prev, isLoading: false, error: error.message }));
       throw error;
     }
   }, [documentState.isUploaded, documentState.documentId]);
 
-  // Submit answer
+  // Submit challenge answer
   const submitChallengeAnswer = useCallback(async (questionIndex, answer) => {
     const question = documentState.challenges[questionIndex];
+    const { sessionId, documentId } = documentState;
 
-    if (!question || !documentState.sessionId || !documentState.documentId) {
+    if (!question || !sessionId || !documentId) {
       throw new Error('Missing required fields: sessionId, documentId or question');
     }
 
@@ -177,54 +164,45 @@ export const DocumentProvider = ({ children }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: documentState.sessionId,
+          session_id: sessionId,
           question_id: question.id,
           user_answer: answer,
-          document_id: documentState.documentId
+          document_id: documentId
         })
       });
 
       if (!response.ok) throw new Error('Failed to evaluate answer');
+      const evaluation = await response.json();
 
-      const data = await response.json();
+      const newAnswer = {
+        questionIndex,
+        userAnswer: answer,
+        evaluation,
+        timestamp: new Date()
+      };
 
       setDocumentState(prev => ({
         ...prev,
         userAnswers: [
           ...prev.userAnswers.filter(a => a.questionIndex !== questionIndex),
-          {
-            questionIndex,
-            userAnswer: answer,
-            evaluation: data,
-            timestamp: new Date()
-          }
+          newAnswer
         ],
         isLoading: false
       }));
 
-      return data;
+      return evaluation;
     } catch (error) {
-      setDocumentState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message
-      }));
+      setDocumentState(prev => ({ ...prev, isLoading: false, error: error.message }));
       throw error;
     }
   }, [documentState.challenges, documentState.sessionId, documentState.documentId]);
 
   const setCurrentChallenge = useCallback((index) => {
-    setDocumentState(prev => ({
-      ...prev,
-      currentChallenge: index
-    }));
+    setDocumentState(prev => ({ ...prev, currentChallenge: index }));
   }, []);
 
   const clearChatHistory = useCallback(() => {
-    setDocumentState(prev => ({
-      ...prev,
-      chatHistory: []
-    }));
+    setDocumentState(prev => ({ ...prev, chatHistory: [] }));
   }, []);
 
   const resetDocument = useCallback(() => {
@@ -245,10 +223,7 @@ export const DocumentProvider = ({ children }) => {
   }, []);
 
   const clearError = useCallback(() => {
-    setDocumentState(prev => ({
-      ...prev,
-      error: null
-    }));
+    setDocumentState(prev => ({ ...prev, error: null }));
   }, []);
 
   const value = {

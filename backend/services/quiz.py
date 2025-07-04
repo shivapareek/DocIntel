@@ -4,6 +4,11 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from services.rag import RAGService
+from sentence_transformers import SentenceTransformer, util
+
+# Ek baar hi model load karna hai
+sbert_model = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 
 class QuizService:
@@ -37,55 +42,34 @@ class QuizService:
             ]
         }
 
-    # ------------------------------------------------------------------ #
-    # NEW: register_document                                             #
-    # ------------------------------------------------------------------ #
     async def register_document(self, document_id: str, content: str):
-        """
-        Store document content for later quiz generation.
-        Call this right after a successful upload.
-        """
         self.documents[document_id] = content
-        print(f"📌 Registered document in QuizService: {document_id} "
-              f"(len={len(content)} chars)")
+        print(f"📌 Registered document in QuizService: {document_id} (len={len(content)} chars)")
 
-    # ------------------------------------------------------------------ #
-    # Question generation                                                #
-    # ------------------------------------------------------------------ #
     async def generate_questions(
         self,
         doc_id: str,
         difficulty: str = "medium",
         num_questions: int = 3,
-    ) -> Dict[str, Any]: 
-        
-        """Generate quiz questions from document."""
-        
+    ) -> Dict[str, Any]:
         try:
-            # 1️⃣  Get document text (from local cache first)
             if doc_id in self.documents:
                 content = self.documents[doc_id]
             else:
-                # fallback – verify via RAGService
                 if not await self.rag_service.document_exists(doc_id):
                     raise Exception("Document not found")
-
                 ctx = await self.rag_service.get_document_context(doc_id)
                 content = ctx["preview"]
-                # option: cache it
                 self.documents[doc_id] = content
 
-            # 2️⃣  Generate session & key concepts
             session_id = str(uuid.uuid4())
             key_concepts = self._extract_key_concepts(content)
 
-            # 3️⃣  Build questions list
             questions = [
                 await self._generate_single_question(doc_id, key_concepts, difficulty, i)
                 for i in range(num_questions)
             ]
 
-            # 4️⃣  Save session
             self.sessions[session_id] = {
                 "doc_id": doc_id,
                 "questions": questions,
@@ -101,11 +85,7 @@ class QuizService:
         except Exception as e:
             raise Exception(f"Error generating questions: {e}") from e
 
-    # ------------------------------------------------------------------ #
-    # Helpers                                                            #
-    # ------------------------------------------------------------------ #
     def _extract_key_concepts(self, content: str) -> List[str]:
-        """Very naïve keyword extraction."""
         common = {
             "the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
             "for", "of", "with", "by", "is", "are", "was", "were", "be",
@@ -130,6 +110,7 @@ class QuizService:
         idx: int,
     ) -> Dict[str, Any]:
         q_id = f"q_{idx}"
+
         qt_pool = (
             ["comprehension"]
             if difficulty == "easy"
@@ -138,17 +119,33 @@ class QuizService:
             else ["comprehension", "analysis", "application"]
         )
         q_type = random.choice(qt_pool)
-        concept = random.choice(key_concepts) if key_concepts else "the main topic"
         template = random.choice(self.question_templates[q_type])
-        q_text = template.format(concept) if "{}" in template else template
+        placeholder_count = template.count("{}")
+
+        if placeholder_count == 1:
+            concept = random.choice(key_concepts) if key_concepts else "the main topic"
+            q_text = template.format(concept)
+
+        elif placeholder_count >= 2:
+            if len(key_concepts) >= placeholder_count:
+                selected = random.sample(key_concepts, placeholder_count)
+            else:
+                selected = key_concepts + ["topic"] * (placeholder_count - len(key_concepts))
+            q_text = template.format(*selected)
+            concept = ", ".join(selected)
+        else:
+            q_text = template
+            concept = "general"
 
         answer = await self.rag_service.answer_question(question=q_text, doc_id=doc_id)
+
         q_format = random.choice(["short_answer", "multiple_choice"])
         options = (
             await self._generate_multiple_choice_options(q_text, answer["answer"], doc_id)
             if q_format == "multiple_choice"
             else None
         )
+
         return {
             "id": q_id,
             "question": q_text,
@@ -173,25 +170,26 @@ class QuizService:
             "According to the document, this is not the primary focus.",
         ]
         opts.extend(distractors[:2])
+
         hits = await self.rag_service.search_document(query=question, doc_id=doc_id, top_k=3)
         if hits:
             opts.append(f"The document states: {hits[-1]['content'][:100]}...")
+
         random.shuffle(opts)
         return opts[:4]
 
-    # ------------------------------------------------------------------ #
-    # Answer evaluation / feedback / session mgmt unchanged              #
-    # ------------------------------------------------------------------
-    # ... (keep the rest of your existing methods: evaluate_answer, etc.)
-
     async def evaluate_answer(self, session_id, question_id, user_answer, doc_id):
-        # ✅ Example logic — replace with your own evaluation process
         questions = self.sessions[session_id]["questions"]
         question = next((q for q in questions if q["id"] == question_id), None)
 
         if question is None:
             raise ValueError(f"Question ID {question_id} not found in session.")
-        correct = user_answer.strip().lower() == question["correct_answer"].strip().lower()
+
+        def normalize(text):
+            import re
+            return re.sub(r'\W+', '', text).lower().strip()
+
+        correct = normalize(user_answer) == normalize(question["correct_answer"])
 
         return {
             "correct": correct,
