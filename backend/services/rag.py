@@ -1,23 +1,21 @@
-import os
-import uuid
-import json
+import os, uuid, json
 from typing import Dict, Any, List, Optional
 
+
 import chromadb
-from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain_community.llms import OpenAI
-from langchain_community.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
+from services.summary import generate_summary as _gen_sum
 
 load_dotenv()
 
+
 class RAGService:
     def __init__(self):
+        # ── paths & helpers
         self.persist_directory = "./store"
         os.makedirs(self.persist_directory, exist_ok=True)
 
@@ -25,309 +23,204 @@ class RAGService:
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len,
+            chunk_size=1000, chunk_overlap=200, length_function=len
         )
 
         self.client = chromadb.PersistentClient(path=self.persist_directory)
         self.llm = self._initialize_llm()
-        self.documents = {}
+
+        self.documents: Dict[str, Any] = {}
         self._load_documents()
 
+        # QA prompt (अस‑is)
         self.qa_prompt = PromptTemplate(
-            template="""Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-Always provide a justification for your answer based on the context.
+            template="""Use the following pieces of context to answer the question at the end.
+If you don't know the answer, just say you don't know.
+Always justify from the context.
 
-Context: {context}
+Context:
+{context}
 
 Question: {question}
 
-Please provide:
-1. A clear answer
-2. Justification with specific reference to the context
-3. Confidence level (0-1)
+Return:
+1. Answer
+2. Justification (cite context)
+3. Confidence (0‑1)
 
 Answer:""",
-            input_variables=["context", "question"]
+            input_variables=["context", "question"],
         )
 
+    # ───────────────────────── internal helpers
     def _initialize_llm(self):
-        try:
-            if os.getenv("OPENAI_API_KEY"):
-                return ChatOpenAI(
-                    model_name="gpt-3.5-turbo",
-                    temperature=0.1,
-                    openai_api_key=os.getenv("OPENAI_API_KEY")
-                )
-        except Exception:
-            pass
-        try:
-            if os.getenv("GROQ_API_KEY"):
-                from groq import Groq
-                return Groq(api_key=os.getenv("GROQ_API_KEY"))
-        except Exception:
-            pass
+        key = os.getenv("OPENAI_API_KEY")
+        if key:
+            return ChatOpenAI(
+                model_name="gpt-3.5-turbo",
+                temperature=0.1,
+                openai_api_key=key,
+            )
         return None
 
     def _load_documents(self):
-        for file in os.listdir(self.persist_directory):
-            if file.endswith(".json"):
-                with open(os.path.join(self.persist_directory, file), "r", encoding="utf-8") as f:
-                    doc_data = json.load(f)
-                    doc_id = file.replace(".json", "")
-                    self.documents[doc_id] = doc_data
-                    print(f"📂 Loaded document metadata: {doc_id}")
+        for fn in os.listdir(self.persist_directory):
+            if fn.endswith(".json"):
+                with open(os.path.join(self.persist_directory, fn), encoding="utf-8") as f:
+                    self.documents[fn[:-5]] = json.load(f)
+                print(f"📂 Loaded {fn}")
 
-    async def document_exists(self, doc_id: str) -> bool:
-        doc_id = doc_id.strip()  # ✅ Clean input
-        print(f"🔍 Checking doc_id: {doc_id}")
-        print(f"📄 Available docs: {list(self.documents.keys())}")
-
-        if doc_id in self.documents:
-            return True
-
-        # ✅ Optional fallback: try matching collection_name
-        for meta in self.documents.values():
-            if meta.get("collection_name", "").endswith(doc_id.replace("-", "_")):
-                return True
-
-        return False
-
+    # ───────────────────────── core: upload / index
     async def process_document(self, content: str, filename: str) -> str:
+        doc_id = str(uuid.uuid4())
+        chunks = self.text_splitter.split_text(content)
+        collection_name = f"doc_{doc_id.replace('-', '_')}"
+
+        col = self.client.create_collection(
+            name=collection_name, metadata={"hnsw:space": "cosine"}
+        )
+
+        # 🚀 Batch embed (fast)
+        embeddings = self.embeddings.embed_documents(chunks)
+        ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
+        metas = [{"chunk_id": i, "doc_id": doc_id} for i in range(len(chunks))]
+
+        col.add(embeddings=embeddings, documents=chunks, metadatas=metas, ids=ids)
+
+        self.documents[doc_id] = {
+            "filename": filename,
+            "content": content,
+            "chunks": len(chunks),
+            "collection_name": collection_name,
+        }
+        with open(
+            os.path.join(self.persist_directory, f"{doc_id}.json"), "w", encoding="utf-8"
+        ) as f:
+            json.dump(self.documents[doc_id], f)
+        return doc_id
+
+    # ───────────────────────── summary
+    async def generate_summary(self, doc_id: str) -> str:
+        doc_id = doc_id.strip()
+        if doc_id not in self.documents:
+            raise Exception("Document not found")
+        return _gen_sum(self.documents[doc_id]["content"])
+
+    # ───────────────────────── QA
+    async def answer_question(
+        self,
+        question: str,
+        doc_id: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
         try:
-            doc_id = str(uuid.uuid4())
-            chunks = self.text_splitter.split_text(content)
-            collection_name = f"doc_{doc_id.replace('-', '_')}"
-            collection = self.client.create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"}
-            )
-
-            for i, chunk in enumerate(chunks):
-                embedding = self.embeddings.embed_query(chunk)
-                collection.add(
-                    embeddings=[embedding],
-                    documents=[chunk],
-                    metadatas=[{"chunk_id": i, "doc_id": doc_id}],
-                    ids=[f"{doc_id}_{i}"]
-                )
-
-            self.documents[doc_id] = {
-                "filename": filename,
-                "content": content,
-                "chunks": len(chunks),
-                "collection_name": collection_name
-            }
-
-            with open(os.path.join(self.persist_directory, f"{doc_id}.json"), "w", encoding="utf-8") as f:
-                json.dump(self.documents[doc_id], f)
-
-            return doc_id
-
-        except Exception as e:
-            raise Exception(f"Error processing document: {str(e)}")
-
-    async def answer_question(self, question: str, doc_id: str,
-                              conversation_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
-        try:
-            doc_id = doc_id.strip()  # ✅ Consistency
+            doc_id = doc_id.strip()
             if doc_id not in self.documents:
                 raise Exception("Document not found")
 
-            collection_name = self.documents[doc_id]["collection_name"]
-            collection = self.client.get_collection(collection_name)
-
-            query_embedding = self.embeddings.embed_query(question)
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=5
+            col = self.client.get_collection(self.documents[doc_id]["collection_name"])
+            results = col.query(
+                query_embeddings=[self.embeddings.embed_query(question)],
+                n_results=5,
             )
-
             context = "\n\n".join(results["documents"][0])
 
-            if self.llm:
-                conv_context = ""
+            if self.llm and hasattr(self.llm, "predict"):
+                prev = ""
                 if conversation_history:
                     for turn in conversation_history[-3:]:
-                        conv_context += f"Q: {turn.get('question', '')}\nA: {turn.get('answer', '')}\n\n"
-
-                full_prompt = f"""Based on the following document context, answer the question.
-
-Previous conversation:
-{conv_context}
-
-Document context:
-{context}
-
-Current question: {question}
-
-Please provide a clear answer with justification."""
-
-                if hasattr(self.llm, 'predict'):
-                    answer = self.llm.predict(full_prompt)
-                else:
-                    answer = self._generate_basic_answer(question, context)
+                        prev += f"Q: {turn['question']}\nA: {turn['answer']}\n\n"
+                prompt = self.qa_prompt.format(context=context, question=question)
+                answer = self.llm.predict(prev + prompt)
             else:
                 answer = self._generate_basic_answer(question, context)
 
             return {
                 "answer": answer,
-                "justification": f"Based on {len(results['documents'][0])} relevant passages from the document",
+                "justification": f"Citing {len(results['documents'][0])} passages",
                 "source_snippets": results["documents"][0][:3],
-                "confidence": 0.8
+                "confidence": 0.8,
             }
-
         except Exception as e:
             return {
-                "answer": f"Error answering question: {str(e)}",
-                "justification": "System error occurred",
+                "answer": f"Error: {e}",
+                "justification": "System error",
                 "source_snippets": [],
-                "confidence": 0.0
+                "confidence": 0.0,
             }
 
     def _generate_basic_answer(self, question: str, context: str) -> str:
-        question_lower = question.lower()
-        context_lower = context.lower()
+        q_words = set(question.lower().split())
+        sents = [s.strip() for s in context.split(".") if s.strip()]
+        hits = [
+            s for s in sents if len(q_words.intersection(set(s.lower().split()))) > 0
+        ]
+        return ". ".join(hits[:3]) + "." if hits else "No exact answer found."
 
-        sentences = context.split('.')
-        relevant_sentences = []
-
-        question_words = set(question_lower.split())
-
-        for sentence in sentences:
-            sentence_words = set(sentence.lower().split())
-            if len(question_words.intersection(sentence_words)) > 0:
-                relevant_sentences.append(sentence.strip())
-
-        if relevant_sentences:
-            return '. '.join(relevant_sentences[:3]) + '.'
-        else:
-            return "I couldn't find a specific answer to your question in the document."
-
-    async def generate_summary(self, doc_id: str, max_words: int = 150) -> str:
-        try:
-            doc_id = doc_id.strip()
-            if doc_id not in self.documents:
-                raise Exception("Document not found")
-
-            content = self.documents[doc_id]["content"]
-
-            if self.llm:
-                prompt = f"""Summarize the following document in exactly {max_words} words or less. 
-Focus on the main points and key information:
-
-{content[:3000]}
-
-Summary:"""
-
-                if hasattr(self.llm, 'predict'):
-                    summary = self.llm.predict(prompt)
-                else:
-                    summary = self._generate_basic_summary(content, max_words)
-            else:
-                summary = self._generate_basic_summary(content, max_words)
-
-            return summary.strip()
-
-        except Exception as e:
-            return f"Error generating summary: {str(e)}"
-
-    def _generate_basic_summary(self, content: str, max_words: int) -> str:
-        sentences = content.split('. ')
-        summary_sentences = []
-        word_count = 0
-
-        for sentence in sentences:
-            sentence_words = len(sentence.split())
-            if word_count + sentence_words <= max_words:
-                summary_sentences.append(sentence)
-                word_count += sentence_words
-            else:
-                break
-
-        return '. '.join(summary_sentences) + '.'
-
-    async def delete_document(self, doc_id: str) -> bool:
-        try:
-            doc_id = doc_id.strip()
-            if doc_id not in self.documents:
-                return False
-
-            collection_name = self.documents[doc_id]["collection_name"]
-            self.client.delete_collection(collection_name)
-            del self.documents[doc_id]
-
-            json_path = os.path.join(self.persist_directory, f"{doc_id}.json")
-            if os.path.exists(json_path):
-                os.remove(json_path)
-
-            return True
-        except Exception:
-            return False
-
-    async def list_documents(self) -> List[Dict[str, Any]]:
+    # ───────────────────────── search
+    async def search_document(self, query: str, doc_id: str, top_k: int = 5):
+        doc_id = doc_id.strip()
+        if doc_id not in self.documents:
+            return []
+        col = self.client.get_collection(self.documents[doc_id]["collection_name"])
+        res = col.query(
+            query_embeddings=[self.embeddings.embed_query(query)], n_results=top_k
+        )
         return [
             {
-                "id": doc_id,
-                "filename": doc_data["filename"],
-                "chunks": doc_data["chunks"]
+                "chunk_id": m["chunk_id"],
+                "content": d,
+                "relevance_score": 1.0 - (i * 0.1),
             }
-            for doc_id, doc_data in self.documents.items()
+            for i, (d, m) in enumerate(zip(res["documents"][0], res["metadatas"][0]))
         ]
 
-    async def suggest_clarifications(self, question: str, doc_id: str) -> List[str]:
-        if doc_id.strip() not in self.documents:
-            return []
+    # ───────────────────────── misc helpers
+    async def delete_document(self, doc_id: str) -> bool:
+        doc_id = doc_id.strip()
+        if doc_id not in self.documents:
+            return False
+        self.client.delete_collection(self.documents[doc_id]["collection_name"])
+        del self.documents[doc_id]
+        json_path = os.path.join(self.persist_directory, f"{doc_id}.json")
+        if os.path.exists(json_path):
+            os.remove(json_path)
+        return True
 
-        clarifications = [
-            f"Could you be more specific about '{question}'?",
-            f"Are you asking about a particular aspect of '{question}'?",
-            f"Would you like me to explain '{question}' in more detail?"
+    async def list_documents(self):
+        return [
+            {"id": did, "filename": m["filename"], "chunks": m["chunks"]}
+            for did, m in self.documents.items()
         ]
-        return clarifications[:3]
 
-    async def get_document_context(self, doc_id: str) -> Dict[str, Any]:
+    async def get_document_context(self, doc_id: str):
         doc_id = doc_id.strip()
         if doc_id not in self.documents:
             raise Exception("Document not found")
-
-        doc_data = self.documents[doc_id]
-        content = doc_data["content"]
-
+        meta = self.documents[doc_id]
+        c = meta["content"]
         return {
-            "filename": doc_data["filename"],
-            "word_count": len(content.split()),
-            "character_count": len(content),
-            "chunks": doc_data["chunks"],
-            "preview": content[:500] + "..." if len(content) > 500 else content
+            "filename": meta["filename"],
+            "word_count": len(c.split()),
+            "character_count": len(c),
+            "chunks": meta["chunks"],
+            "preview": c[:500] + "..." if len(c) > 500 else c,
         }
 
-    async def search_document(self, query: str, doc_id: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        doc_id = doc_id.strip()
+    async def suggest_clarifications(self, question: str, doc_id: str):
+        if doc_id.strip() not in self.documents:
+            return []
+        return [
+            f"Could you clarify '{question}'?",
+            f"Which aspect of '{question}' interests you?",
+            f"Need more detail on '{question}'?",
+        ]
+
+    async def register_document(self, doc_id: str, content: str):
         if doc_id not in self.documents:
-            return []
-
-        try:
-            collection_name = self.documents[doc_id]["collection_name"]
-            collection = self.client.get_collection(collection_name)
-
-            query_embedding = self.embeddings.embed_query(query)
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k
-            )
-
-            search_results = []
-            for i, (doc, metadata) in enumerate(zip(results["documents"][0], results["metadatas"][0])):
-                search_results.append({
-                    "chunk_id": metadata["chunk_id"],
-                    "content": doc,
-                    "relevance_score": 1.0 - (i * 0.1)
-                })
-
-            return search_results
-
-        except Exception as e:
-            return []
+            self.documents[doc_id] = {
+                "filename": f"{doc_id}.pdf",
+                "content": content,
+                "chunks": len(self.text_splitter.split_text(content)),
+                "collection_name": f"doc_{doc_id.replace('-', '_')}",
+            }
