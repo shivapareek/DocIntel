@@ -12,3 +12,6 @@ backend/uploads/
 
 # React / frontend build
 frontend/node_modules/
+
+# Environment variables
+.env
