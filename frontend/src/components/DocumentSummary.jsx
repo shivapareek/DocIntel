@@ -1,40 +1,43 @@
 import React, { useState, useEffect } from 'react';
+import {
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  BarChart,
+  Target,
+  HelpCircle,
+  Clock,
+} from 'lucide-react';
 
 const DocumentSummary = ({ summary = '', fileName = 'Unknown file' }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [briefSummary, setBriefSummary] = useState('');
 
-  /* ── Build a 2‑3 sentence brief summary ── */
   useEffect(() => {
     if (!summary) return;
-
     const sentences = summary
       .split(/[.!?]+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    /* Grab first 3 or sentences with key words */
     const importantKeywords = [
-      'main',
-      'key',
-      'important',
-      'conclusion',
-      'summary',
-      'findings',
-      'results',
-      'analysis',
-    ];
+  'main',
+  'key',
+  'important',
+  'conclusion',
+  'summary',
+  'findings',
+  'results',
+  'analysis',
+];
 
-    const keyPoints = [];
-    sentences.forEach((sent) => {
-      const hasKeyword = importantKeywords.some((k) =>
-        sent.toLowerCase().includes(k),
-      );
-      if (hasKeyword && keyPoints.length < 3) keyPoints.push(sent);
-    });
+const keyPoints = [];
+sentences.forEach((sent) => {
+  const hasKeyword = importantKeywords.some((k) => sent.toLowerCase().includes(k));
+  if (hasKeyword && keyPoints.length < 3) keyPoints.push(sent);
+});
 
-    const brief =
-      (keyPoints.length ? keyPoints : sentences.slice(0, 3)).join('. ') + '.';
+    const brief = (keyPoints.length ? keyPoints : sentences.slice(0, 3)).join('. ') + '.';
     setBriefSummary(brief);
   }, [summary]);
 
@@ -44,118 +47,88 @@ const DocumentSummary = ({ summary = '', fileName = 'Unknown file' }) => {
   const briefWordCount = briefSummary.split(/\s+/).length;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      {/* Heading */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Document Summary
-          </h2>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+    <div className="relative rounded-2xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl p-8 border border-white/20 dark:border-slate-700/50 shadow-xl shadow-blue-300/10 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-cyan-500 text-white rounded-xl flex items-center justify-center shadow-md">
+            <FileText size={18} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Document Summary</h2>
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
             {isExpanded ? `${wordCount} words` : `${briefWordCount} words`}
           </span>
         </div>
         <button
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="text-sm text-gray-600 hover:text-gray-800 font-medium flex items-center space-x-1 transition-colors"
+          className="flex items-center text-sm font-medium text-sky-600 dark:text-sky-300 hover:underline"
         >
-          <span>{isExpanded ? 'Show Brief' : 'Show Full'}</span>
-          <span
-            className={`transform transition-transform ${
-              isExpanded ? 'rotate-180' : ''
-            }`}
-          >
-            ▼
-          </span>
+          {isExpanded ? 'Show Brief' : 'Show Full'}
+          {isExpanded ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
         </button>
       </div>
 
-      {/* ── FULL SUMMARY ── */}
+      {/* Summary Views */}
       {isExpanded ? (
-        <div className="space-y-4">
+        <>
           {/* Meta */}
-          <div className="bg-gray-50 rounded-md p-4">
-            <div className="flex items-center space-x-2 mb-1">
-              <span className="text-sm font-medium text-gray-700">Source:</span>
-              <span className="text-sm text-gray-600">{fileName}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-gray-700">
-                Generated:
-              </span>
-              <span className="text-sm text-gray-600">
-                {new Date().toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {/* Body */}
-          <div className="prose max-w-none text-gray-800 leading-relaxed">
-            {summary.split('\n').map((p, i) =>
-              p.trim() ? (
-                <p key={i} className="mb-3 last:mb-0">
-                  {p.trim()}
-                </p>
-              ) : null,
-            )}
-          </div>
-
-          {/* Footer badges */}
-          <div className="border-t pt-4 flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center space-x-1">
-                <span>📊</span>
-                <span>Detailed analysis</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <span>🎯</span>
-                <span>Complete insights</span>
-              </span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-              <span>Ready for questions</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ── BRIEF SUMMARY ── */
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-md p-4 border-l-4 border-blue-400">
-            <div className="flex items-start space-x-2">
-              <span className="text-blue-600 mt-1">📋</span>
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-300">
+            <div className="bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-900/20 dark:to-sky-900/20 rounded-xl px-4 py-3 flex items-center gap-2">
+              <FileText size={14} className="text-blue-600 dark:text-blue-400" />
               <div>
-                <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                  Quick Summary
-                </h3>
-                <p className="text-gray-700 text-sm leading-relaxed">
-                  {briefSummary}
-                </p>
+                <strong className="block font-medium text-blue-700 dark:text-blue-300">Source</strong>
+                {fileName}
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-900/20 dark:to-sky-900/20 rounded-xl px-4 py-3 flex items-center gap-2">
+              <Clock size={14} className="text-blue-600 dark:text-blue-400" />
+              <div>
+                <strong className="block font-medium text-blue-700 dark:text-blue-300">Generated</strong>
+                {new Date().toLocaleString()}
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-md p-3">
-            <div className="flex items-center justify-between text-xs text-gray-600">
-              <div className="flex items-center space-x-3">
-                <span className="flex items-center space-x-1">
-                  <span>📄</span>
-                  <span>Source: {fileName}</span>
-                </span>
-                <span className="flex items-center space-x-1">
-                  <span>⏱️</span>
-                  <span>Quick read</span>
-                </span>
-              </div>
-              <button
-                onClick={() => setIsExpanded(true)}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Read full summary →
-              </button>
-            </div>
+          {/* Full Summary Text */}
+          <div className="prose max-w-none text-gray-800 dark:text-gray-100 leading-relaxed">
+            {summary.split('\n').map((p, i) => p.trim() ? <p key={i} className="mb-4 last:mb-0">{p.trim()}</p> : null)}
           </div>
-        </div>
+
+          {/* Badges */}
+          <div className="mt-6 flex flex-wrap gap-3 text-sm">
+            <span className="flex items-center gap-2 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-3 py-1 rounded-full">
+              <BarChart size={14} /> Detailed Analysis
+            </span>
+            <span className="flex items-center gap-2 bg-blue-100 dark:bg-blue-800/40 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
+              <Target size={14} /> Key Insights
+            </span>
+            <span className="flex items-center gap-2 bg-green-100 dark:bg-green-800/40 text-green-700 dark:text-green-300 px-3 py-1 rounded-full">
+              <HelpCircle size={14} /> Ready for Q&A
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Brief */}
+          <div className="bg-gradient-to-br from-sky-50 to-blue-100 dark:from-blue-900/20 dark:to-sky-900/10 border-l-4 border-blue-400 rounded-xl p-4 text-gray-800 dark:text-gray-100 leading-relaxed">
+            <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Quick Summary</h3>
+            <p>{briefSummary}</p>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1"><FileText size={12} /> {fileName}</span>
+              <span className="flex items-center gap-1"><Clock size={12} /> Short Read</span>
+            </div>
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+            >
+              Read full summary →
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

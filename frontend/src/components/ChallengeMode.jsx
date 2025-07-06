@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from "react";
+import {
+  BookText,
+  BrainCircuit,
+  CheckCircle2,
+  XCircle,
+  Lightbulb,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCcw,
+} from "lucide-react";
 import { useDocument } from "../context/DocContext";
 
 /**
  * ChallengeMode – MCQ practice component
  * -------------------------------------------------------------
- * • Generates 3 document‑aware questions via backend.
- * • Shows inline feedback & an optional detailed view.
- * • Persists results so user can review overall score.
+ * • Generates document‑aware questions via backend.
+ * • Modern glassy UI, blue‑cyan palette, no emojis.
  */
 const ChallengeMode = () => {
   const {
@@ -20,217 +29,132 @@ const ChallengeMode = () => {
     isLoading,
   } = useDocument();
 
-  // ────────────────────────────────────────────────────────────── state
   const [selectedOption, setSelectedOption] = useState("");
   const [showResults, setShowResults] = useState(false);
-  const [showDetailedFeedback, setShowDetailedFeedback] = useState(false);
+  const [showDetailed, setShowDetailed] = useState(false);
 
-  // Reset radio + close detailed panel whenever we change Q
   useEffect(() => {
     setSelectedOption("");
-    setShowDetailedFeedback(false);
+    setShowDetailed(false);
   }, [currentChallenge]);
 
-  // ────────────────────────────────────────────────────────────── helpers
-  const getCurrentAnswer = () =>
-    userAnswers.find((a) => a.questionIndex === currentChallenge);
+  /* --------------------------- helpers --------------------------- */
+  const getAnswer = () => userAnswers.find((a) => a.questionIndex === currentChallenge);
+  const color = (score) =>
+    score >= 80 ? "text-emerald-600" : score >= 60 ? "text-amber-500" : "text-rose-600";
+  const overall = () =>
+    userAnswers.length
+      ? Math.round(userAnswers.reduce((s, a) => s + (a.evaluation.score || 0), 0) / userAnswers.length)
+      : 0;
 
-  const getScoreColor = (score) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const getOverallScore = () => {
-    if (!userAnswers.length) return 0;
-    const total = userAnswers.reduce(
-      (sum, a) => sum + (a.evaluation?.score || 0),
-      0
-    );
-    return Math.round(total / userAnswers.length);
-  };
-
-  // ────────────────────────────────────────────────────────────── actions
-  const handleStartChallenge = async () => {
+  /* --------------------------- actions -------------------------- */
+  const start = async () => {
     await generateChallenges();
     setShowResults(false);
-    setSelectedOption("");
-    setShowDetailedFeedback(false);
   };
-
-  const handleSubmitAnswer = async () => {
-    if (!selectedOption || currentChallenge === null) return;
+  const submit = async () => {
+    if (!selectedOption) return;
     await submitChallengeAnswer(currentChallenge, selectedOption);
-    setSelectedOption("");
-    setShowDetailedFeedback(true);
+    setShowDetailed(true);
   };
+  const next = () => currentChallenge < challenges.length - 1 && setCurrentChallenge(currentChallenge + 1);
+  const prev = () => currentChallenge > 0 && setCurrentChallenge(currentChallenge - 1);
 
-  const handleNext = () => {
-    if (currentChallenge < challenges.length - 1) {
-      setCurrentChallenge(currentChallenge + 1);
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentChallenge > 0) {
-      setCurrentChallenge(currentChallenge - 1);
-    }
-  };
-
-  // ────────────────────────────────────────────────────────────── render
-  if (!isUploaded) {
+  /* ------------------------- UI states -------------------------- */
+  if (!isUploaded)
     return (
-      <div className="p-8 bg-white rounded shadow text-center">
-        <p className="text-xl">📄 Upload a document to start</p>
+      <div className="min-h-[300px] flex flex-col items-center justify-center rounded-3xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 shadow-lg backdrop-blur-xl p-10 text-center">
+        <BookText className="h-10 w-10 text-sky-600 mb-4" />
+        <p className="text-lg text-slate-600 dark:text-slate-300">Upload a document to unlock Challenge Mode.</p>
       </div>
     );
-  }
 
-  // Finished state – show summary panel
-  if (showResults && userAnswers.length) {
-    const overall = getOverallScore();
+  /* Results */
+  if (showResults && userAnswers.length)
     return (
-      <div className="p-6 bg-white rounded shadow w-full max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Challenge Results</h2>
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded"
-            onClick={handleStartChallenge}
-          >
-            Retry
+      <div className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold flex items-center gap-2"><BrainCircuit className="h-6 w-6" /> Results</h2>
+          <button onClick={start} className="flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg">
+            <RefreshCcw className="h-4 w-4" /> Retry
           </button>
         </div>
-
-        <div className="mb-4 text-lg font-semibold">
-          Overall Score: <span className={getScoreColor(overall)}>{overall}%</span>
-        </div>
-
+        <p className="text-lg font-semibold">Overall Score: <span className={`${color(overall())}`}>{overall()}%</span></p>
         {userAnswers.map((ans, i) => {
           const q = challenges.find((c) => c.id === ans.questionId);
           return (
-            <div key={i} className="border p-4 rounded mb-4">
-              <p className="font-bold mb-1">
-                Q{i + 1}: {q?.question}
-              </p>
-              <p>
-                <strong>Your Answer:</strong> {ans.userAnswer}
-              </p>
-              <p className={getScoreColor(ans.evaluation.score)}>
-                ✅ Score: {ans.evaluation.score}% — {ans.evaluation.correct ? "Correct" : "Incorrect"}
-              </p>
-              <p>
-                <strong>Feedback:</strong> {ans.evaluation.feedback}
-              </p>
-              <p>
-                <strong>Justification:</strong> {ans.evaluation.justification}
-              </p>
+            <div key={i} className="border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+              <p className="font-medium mb-2">Q{i + 1}. {q?.question}</p>
+              <p><span className="font-semibold">Your:</span> {ans.userAnswer}</p>
+              <p className={`${color(ans.evaluation.score)} font-semibold mt-1`}>Score: {ans.evaluation.score}%</p>
+              <p className="mt-1"><span className="font-semibold">Feedback:</span> {ans.evaluation.feedback}</p>
+              <p className="mt-1"><span className="font-semibold">Justification:</span> {ans.evaluation.justification}</p>
             </div>
           );
         })}
       </div>
     );
-  }
 
-  // No questions yet – show start screen
-  if (!challenges.length) {
+  /* Start screen */
+  if (!challenges.length)
     return (
-      <div className="p-8 bg-white rounded shadow text-center">
-        <p className="text-2xl mb-4">🧠 Challenge Mode</p>
-        <button
-          onClick={handleStartChallenge}
-          className="bg-blue-600 text-white px-6 py-3 rounded"
-        >
+      <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-12 space-y-6 max-w-xl mx-auto animate-fade-in">
+        <BrainCircuit className="h-12 w-12 text-sky-600" />
+        <h2 className="text-2xl font-bold">Challenge Mode</h2>
+        <button onClick={start} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-xl">
           {isLoading ? "Loading…" : "Start Challenge"}
         </button>
       </div>
     );
-  }
 
-  // Ongoing quiz view --------------------------------------------------
-  const currentQuestion = challenges[currentChallenge];
-  const currentUserAnswer = getCurrentAnswer();
+  /* Quiz view */
+  const q = challenges[currentChallenge];
+  const answer = getAnswer();
 
   return (
-    <div className="p-6 bg-white rounded shadow w-full max-w-2xl mx-auto">
-      <div className="flex justify-between mb-4">
-        <h2 className="text-2xl font-semibold">Challenge Mode</h2>
-        <button onClick={() => setShowResults(true)} className="text-blue-600 underline">
-          View Results
-        </button>
+    <div className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 space-y-6 animate-fade-in">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><BrainCircuit className="h-5 w-5" /> Question {currentChallenge + 1}</h2>
+        <button onClick={() => setShowResults(true)} className="text-sky-600 hover:underline text-sm">View Results</button>
       </div>
+      <p className="text-lg font-medium mb-2">{q.question}</p>
 
-      <h3 className="mb-4 font-medium text-lg">
-        Question {currentChallenge + 1}: {currentQuestion.question}
-      </h3>
-
-      <div className="space-y-3 mb-6">
-        {Object.entries(currentQuestion.options).map(([letter, text]) => (
-          <label
-            key={letter}
-            className="flex items-start space-x-2 p-3 border rounded cursor-pointer hover:bg-gray-100"
-          >
-            <input
-              type="radio"
-              name="option"
-              value={letter}
-              checked={selectedOption === letter}
-              onChange={() => setSelectedOption(letter)}
-              className="mt-1"
-            />
-            <span><strong>{letter}.</strong> {text}</span>
+      <div className="space-y-3">
+        {Object.entries(q.options).map(([opt, txt]) => (
+          <label key={opt} className={`flex items-start gap-3 p-4 rounded-xl border ${
+            selectedOption === opt ? 'border-sky-500 bg-sky-50 dark:bg-sky-800/30' : 'border-slate-200 dark:border-slate-700'
+          } cursor-pointer`}>
+            <input type="radio" name="option" value={opt} checked={selectedOption === opt} onChange={() => setSelectedOption(opt)} className="mt-1" />
+            <span><strong>{opt}.</strong> {txt}</span>
           </label>
         ))}
       </div>
 
-      {/* Answer panel */}
-      {currentUserAnswer ? (
-        <div className="mt-4 p-4 bg-gray-100 rounded">
-          <p>
-            <strong>Your Answer:</strong> {currentUserAnswer.userAnswer}
+      {answer ? (
+        <div className={`mt-4 p-5 rounded-xl ${
+          answer.evaluation.correct ? 'bg-emerald-50 dark:bg-emerald-800/20 border border-emerald-200 dark:border-emerald-600' : 'bg-rose-50 dark:bg-rose-800/20 border border-rose-200 dark:border-rose-600'
+        }`}>
+          <p className="flex items-center gap-2 font-medium">
+            {answer.evaluation.correct ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-rose-600" />} 
+            Score: {answer.evaluation.score}%
           </p>
-          <p className={getScoreColor(currentUserAnswer.evaluation.score)}>
-            ✅ Score: {currentUserAnswer.evaluation.score}% — {currentUserAnswer.evaluation.correct ? "Correct" : "Incorrect"}
-          </p>
-
-          {showDetailedFeedback ? (
-            <div className="mt-2 space-y-1">
-              <p>
-                <strong>Feedback:</strong> {currentUserAnswer.evaluation.feedback}
-              </p>
-              <p>
-                <strong>Justification:</strong> {currentUserAnswer.evaluation.justification}
-              </p>
+          <p className="mt-1"><span className="font-semibold">Your:</span> {answer.userAnswer}</p>
+          {showDetailed ? (
+            <div className="mt-2 space-y-1 text-sm">
+              <p><span className="font-semibold">Feedback:</span> {answer.evaluation.feedback}</p>
+              <p><span className="font-semibold">Justification:</span> {answer.evaluation.justification}</p>
             </div>
           ) : (
-            <button
-              className="text-sm text-blue-600 underline mt-2"
-              onClick={() => setShowDetailedFeedback(true)}
-            >
-              Show Detailed Feedback
-            </button>
+            <button onClick={() => setShowDetailed(true)} className="text-sky-600 text-xs mt-2 hover:underline">Show Details</button>
           )}
         </div>
       ) : (
-        <button
-          onClick={handleSubmitAnswer}
-          disabled={!selectedOption}
-          className="bg-blue-600 text-white px-5 py-2 rounded"
-        >
-          Submit Answer
-        </button>
+        <button onClick={submit} disabled={!selectedOption} className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-2 rounded-xl disabled:opacity-40">Submit Answer</button>
       )}
 
-      {/* Nav controls */}
-      <div className="flex justify-between mt-8 text-gray-700">
-        <button onClick={handlePrev} disabled={currentChallenge === 0}>
-          ← Previous
-        </button>
-        <button
-          onClick={handleNext}
-          disabled={currentChallenge === challenges.length - 1 || !currentUserAnswer}
-        >
-          Next →
-        </button>
+      <div className="flex justify-between pt-6 text-slate-700 dark:text-slate-300 text-sm">
+        <button onClick={prev} disabled={currentChallenge === 0} className="flex items-center gap-1 disabled:opacity-40"><ChevronLeft className="h-4 w-4"/>Prev</button>
+        <button onClick={next} disabled={currentChallenge === challenges.length - 1 || !answer} className="flex items-center gap-1 disabled:opacity-40">Next<ChevronRight className="h-4 w-4"/></button>
       </div>
     </div>
   );
