@@ -36,24 +36,6 @@
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Client
-        A[React App]
-    end
-    subgraph Server
-        B[FastAPI Gateway]
-        C[RAGService](Document Memory)
-        D[LLM Runtime](Mistral 7B – gguf)
-    end
-    A -- REST + WebSocket --> B
-    B -- Document chunks --> C
-    C -- Prompt + Context --> D
-    D -- JSON response --> C
-    C -- Answer / Quiz JSON --> B
-    B -- JSON --> A
-```
-
 > **Flow Explanation:**  
 > 1. **Client** uploads a PDF → FastAPI streams file to the server.  
 > 2. **RAGService** splits & embeds chunks; stores metadata in memory.  
