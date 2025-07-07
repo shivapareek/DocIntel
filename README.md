@@ -13,10 +13,8 @@
 4. [Detailed Setup](#detailed-setup)  
    - [Backend](#backend-setup)  
    - [Frontend](#frontend-setup)  
-5. [Folder Structure](#folder-structure)  
-6. [Roadmap](#roadmap)  
-7. [Contributing](#contributing)  
-8. [License](#license)
+5. [Folder Structure](#folder-structure)   
+6. [Contributing](#contributing)  
 
 ---
 
