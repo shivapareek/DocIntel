@@ -30,6 +30,8 @@
 | 🎨 | **Modern UI** | Responsive React + Tailwind, dark‑mode toggle, soft shadows, smooth animations |
 | ⚡ | **Fast & Light** | No heavyweight DB; in‑memory doc store for quick prototyping, pluggable with Postgres/Chroma later |
 
+> **Note:** Currently, uploaded PDFs/txt files are stored locally for development/testing. In future versions, storage will be upgraded to a scalable and secure solution (e.g. AWS S3, Firebase Storage, or encrypted DB). 🔐
+
 ---
 
 ## Architecture
