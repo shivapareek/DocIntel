@@ -1,6 +1,4 @@
-"""
-Enhanced QA router for document‑aware chat
-"""
+
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -8,17 +6,15 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.singleton import rag_service  # ✅ shared RAG service instance
+from services.singleton import rag_service  
 
 router = APIRouter()
 
 
-# ────────────────────────────────
-# Pydantic models
-# ────────────────────────────────
+
 class QuestionRequest(BaseModel):
     question: str
-    document_id: Optional[str] = None          # optional for general chat
+    document_id: Optional[str] = None         
     conversation_history: Optional[List[Dict[str, str]]] = []
 
 
@@ -29,17 +25,12 @@ class QuestionResponse(BaseModel):
     confidence: float
 
 
-# ────────────────────────────────
-# /ask  → intelligent Q&A
-# ────────────────────────────────
 @router.post("/ask", response_model=QuestionResponse)
 async def ask_question(payload: QuestionRequest) -> QuestionResponse:
     """
     Intelligent question‑answering with justification + confidence.
     Falls back to friendly error msg if anything breaks.
     """
-    print(f"📩 /api/qa/ask called ↠ {payload.question}")
-    print(f"📄 doc_id ↠ {repr(payload.document_id)}")
 
     try:
         # Core RAG call
@@ -49,9 +40,6 @@ async def ask_question(payload: QuestionRequest) -> QuestionResponse:
             conversation_history=payload.conversation_history or [],
         )
 
-        print("✅ answer:", result["answer"][:80], "…")
-        print("📍 justification:", result["justification"])
-        print("📚 snippets:", len(result["source_snippets"]))
 
         return QuestionResponse(
             answer=result["answer"],
@@ -61,7 +49,7 @@ async def ask_question(payload: QuestionRequest) -> QuestionResponse:
         )
 
     except Exception as e:
-        print("❌ ask_question error:", str(e))
+        print(" ask_question error:", str(e))
 
         # Context‑aware friendly fallback
         error_msg = (
@@ -81,16 +69,12 @@ async def ask_question(payload: QuestionRequest) -> QuestionResponse:
         )
 
 
-# ────────────────────────────────
-# /clarify  → suggestion helper
-# ────────────────────────────────
 @router.post("/clarify")
 async def clarify_question(request: QuestionRequest) -> Dict[str, Any]:
     """
     Return clarification suggestions if question vague / doc missing.
     """
     try:
-        # Check doc existence when doc_id supplied
         if request.document_id and not await rag_service.document_exists(
             request.document_id
         ):
@@ -117,7 +101,7 @@ async def clarify_question(request: QuestionRequest) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        print("❌ clarify_question error:", str(e))
+        print(" clarify_question error:", str(e))
         return {
             "suggestions": [
                 "Apna sawaal thoda aur specific banao",
@@ -128,9 +112,6 @@ async def clarify_question(request: QuestionRequest) -> Dict[str, Any]:
         }
 
 
-# ────────────────────────────────
-# /context/{doc_id}  → doc metadata
-# ────────────────────────────────
 @router.get("/context/{doc_id}")
 async def get_document_context(doc_id: str) -> Dict[str, Any]:
     """
@@ -152,7 +133,7 @@ async def get_document_context(doc_id: str) -> Dict[str, Any]:
         return context
 
     except Exception as e:
-        print("❌ get_document_context error:", str(e))
+        print(" get_document_context error:", str(e))
         raise HTTPException(
             status_code=404,
             detail={
@@ -163,9 +144,6 @@ async def get_document_context(doc_id: str) -> Dict[str, Any]:
         )
 
 
-# ────────────────────────────────
-# /search  → ranked passage search
-# ────────────────────────────────
 @router.post("/search")
 async def search_document(request: QuestionRequest) -> Dict[str, Any]:
     """
@@ -215,7 +193,7 @@ async def search_document(request: QuestionRequest) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        print("❌ search_document error:", str(e))
+        print(" search_document error:", str(e))
         return {
             "query": request.question,
             "results": [],
@@ -224,9 +202,6 @@ async def search_document(request: QuestionRequest) -> Dict[str, Any]:
         }
 
 
-# ────────────────────────────────
-# /health  → status endpoint
-# ────────────────────────────────
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """

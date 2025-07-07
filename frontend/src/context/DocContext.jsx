@@ -28,7 +28,6 @@ export const DocumentProvider = ({ children }) => {
 
   const API_BASE_URL = '/api';
 
-  // Upload document
   const uploadDocument = useCallback(async (file) => {
     setDocumentState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -70,7 +69,6 @@ export const DocumentProvider = ({ children }) => {
     }
   }, []);
 
-  // Ask question
   const askQuestion = useCallback(async (question) => {
     if (!documentState.isUploaded) throw new Error('Please upload a document first');
 
@@ -114,7 +112,6 @@ export const DocumentProvider = ({ children }) => {
     }
   }, [documentState.isUploaded, documentState.documentId]);
 
-  // Generate challenges
   const generateChallenges = useCallback(async () => {
     if (!documentState.isUploaded) throw new Error('Please upload a document first');
 
@@ -148,7 +145,6 @@ export const DocumentProvider = ({ children }) => {
     }
   }, [documentState.isUploaded, documentState.documentId]);
 
-  // Submit challenge answer
   const submitChallengeAnswer = useCallback(async (questionIndex, answer) => {
     const question = documentState.challenges[questionIndex];
     const { sessionId, documentId } = documentState;

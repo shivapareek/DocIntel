@@ -1,10 +1,3 @@
-"""
-routers/challenge.py – Enhanced version with detailed feedback
-------------------------------------------------------------
-• Uses improved QuizService with realistic question generation
-• Provides detailed justifications and explanations
-• Better error handling and response formatting
-"""
 
 from __future__ import annotations
 
@@ -18,7 +11,6 @@ from services.singleton import rag_service, quiz_service
 
 router = APIRouter()
 
-# ----------------------------- Schemas ----------------------------- #
 class ChallengeRequest(BaseModel):
     document_id: str
     num_questions: int | None = 3
@@ -36,7 +28,7 @@ class ChallengeResponse(BaseModel):
 class AnswerRequest(BaseModel):
     session_id: str
     question_id: str
-    user_answer: str  # A/B/C/D
+    user_answer: str  
 
 class AnswerResponse(BaseModel):
     correct: bool
@@ -49,7 +41,7 @@ class AnswerResponse(BaseModel):
 
 class BatchAnswerRequest(BaseModel):
     session_id: str
-    answers: Dict[str, str]  # {question_id: "A/B/C/D"}
+    answers: Dict[str, str]
 
 class BatchAnswerResponse(BaseModel):
     results: list[Dict[str, Any]]
@@ -57,16 +49,16 @@ class BatchAnswerResponse(BaseModel):
     total_questions: int
     correct_answers: int
 
-# ----------------------------- Routes ------------------------------ #
+
 @router.post("/challenge/generate", response_model=ChallengeResponse)
 async def generate_challenge(req: ChallengeRequest):
     """Generate realistic, context-aware challenge questions."""
     try:
-        # Validate document exists
+        
         if not await quiz_service.rag_service.document_exists(req.document_id):
             raise HTTPException(status_code=404, detail="Document not found")
         
-        # Generate questions
+        
         data = await quiz_service.generate_questions(req.document_id, req.num_questions or 3)
         
         return ChallengeResponse(
@@ -86,22 +78,22 @@ async def generate_challenge(req: ChallengeRequest):
 async def evaluate_answer(req: AnswerRequest):
     """Evaluate a single answer with detailed feedback."""
     try:
-        # Validate session and question
+       
         session = quiz_service.active_quizzes.get(req.session_id)
         if not session or req.question_id not in session:
             raise HTTPException(status_code=404, detail="Invalid session or question ID")
 
-        # Get answer metadata
+        
         meta = session[req.question_id]
         correct_letter = meta["correct"]
         justification = meta["justification"]
         explanation = meta.get("explanation", "")
         
-        # Evaluate answer
+        
         user_answer = req.user_answer.strip().upper()
         is_correct = user_answer == correct_letter
         
-        # Generate feedback
+       
         if is_correct:
             feedback = "🎉 Excellent! You got it right!"
         else:
@@ -133,7 +125,6 @@ async def evaluate_answer(req: AnswerRequest):
 async def batch_evaluate_answers(req: BatchAnswerRequest):
     """Evaluate all answers at once with comprehensive results."""
     try:
-        # Validate session
         session = quiz_service.active_quizzes.get(req.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Invalid or expired session")
@@ -142,7 +133,6 @@ async def batch_evaluate_answers(req: BatchAnswerRequest):
         correct_count = 0
         total_questions = len(session)
         
-        # Evaluate each answer
         for question_id, meta in session.items():
             user_answer = req.answers.get(question_id, "").strip().upper()
             correct_letter = meta["correct"]
@@ -165,10 +155,10 @@ async def batch_evaluate_answers(req: BatchAnswerRequest):
                 "explanation": meta.get("explanation", "")
             })
         
-        # Calculate overall score
+        
         overall_score = (correct_count / total_questions) * 100 if total_questions > 0 else 0
         
-        # Clean up session
+        
         quiz_service.active_quizzes.pop(req.session_id, None)
         
         return BatchAnswerResponse(

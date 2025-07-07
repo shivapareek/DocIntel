@@ -4,7 +4,7 @@ import { Upload, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "../context/ToastContext"; // ✅ import
 
 const DocumentUpload = ({ setSummary, setFileName }) => {
-  const { showToast } = useToast(); // ✅ call toast
+  const { showToast } = useToast(); 
   const {
     uploadDocument,
     isUploaded,
@@ -21,57 +21,45 @@ const DocumentUpload = ({ setSummary, setFileName }) => {
   const handleFileSelect = async (file) => {
     if (!file) return;
     
-    console.log("📁 File selected:", file.name, "Size:", file.size, "Type:", file.type);
-    
+  
     const allowed = ["application/pdf", "text/plain"];
     if (!allowed.includes(file.type)) {
-      console.error("❌ Invalid file type:", file.type);
       showToast({ message: "Please upload only PDF or TXT files", type: "error" });
       return;
     }
     
     if (file.size > 10 * 1024 * 1024) {
-      console.error("❌ File too large:", file.size);
       showToast({ message: "File size must be < 10 MB", type: "error" });
       return;
     }
 
-    // ✅ Check if file is empty
     if (file.size === 0) {
-      console.error("❌ File is empty");
       showToast({ message: "Selected file is empty", type: "error" });
       return;
     }
 
-    // ✅ For text files, let's read content to verify
     if (file.type === "text/plain") {
       try {
         const text = await file.text();
-        console.log("📝 Text content preview:", text.substring(0, 100));
         
         if (!text.trim()) {
-          console.error("❌ Text file has no content");
           showToast({ message: "Text file appears to be empty", type: "error" });
           return;
         }
       } catch (error) {
-        console.error("❌ Error reading text file:", error);
         showToast({ message: "Error reading text file", type: "error" });
         return;
       }
     }
 
     try {
-      console.log("🚀 Starting upload process...");
       const data = await uploadDocument(file);
-      console.log("✅ Upload successful:", data);
       
       setSummary(data.summary);
       setFileName(file.name);
       showToast({ message: `${file.name} uploaded successfully!`, type: "success" });
       
     } catch (err) {
-      console.error("❌ Upload failed:", err);
       showToast({ message: "Upload failed. Try again.", type: "error" });
     }
   };
@@ -79,7 +67,6 @@ const DocumentUpload = ({ setSummary, setFileName }) => {
   const handleDrop = (e) => { 
     e.preventDefault(); 
     setDragOver(false); 
-    console.log("📂 File dropped:", e.dataTransfer.files[0]?.name);
     handleFileSelect(e.dataTransfer.files[0]); 
   };
   
@@ -94,7 +81,6 @@ const DocumentUpload = ({ setSummary, setFileName }) => {
   };
   
   const handleInputChange = (e) => {
-    console.log("📁 File input changed:", e.target.files[0]?.name);
     handleFileSelect(e.target.files[0]);
   };
   

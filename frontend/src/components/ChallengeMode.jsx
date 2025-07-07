@@ -11,12 +11,6 @@ import {
 } from "lucide-react";
 import { useDocument } from "../context/DocContext";
 
-/**
- * ChallengeMode – MCQ practice component
- * -------------------------------------------------------------
- * • Generates document‑aware questions via backend.
- * • Modern glassy UI, blue‑cyan palette, no emojis.
- */
 const ChallengeMode = () => {
   const {
     isUploaded,
@@ -38,7 +32,6 @@ const ChallengeMode = () => {
     setShowDetailed(false);
   }, [currentChallenge]);
 
-  /* --------------------------- helpers --------------------------- */
   const getAnswer = () => userAnswers.find((a) => a.questionIndex === currentChallenge);
   const color = (score) =>
     score >= 80 ? "text-emerald-600" : score >= 60 ? "text-amber-500" : "text-rose-600";
@@ -47,7 +40,6 @@ const ChallengeMode = () => {
       ? Math.round(userAnswers.reduce((s, a) => s + (a.evaluation.score || 0), 0) / userAnswers.length)
       : 0;
 
-  /* --------------------------- actions -------------------------- */
   const start = async () => {
     await generateChallenges();
     setShowResults(false);
@@ -60,7 +52,6 @@ const ChallengeMode = () => {
   const next = () => currentChallenge < challenges.length - 1 && setCurrentChallenge(currentChallenge + 1);
   const prev = () => currentChallenge > 0 && setCurrentChallenge(currentChallenge - 1);
 
-  /* ------------------------- UI states -------------------------- */
   if (!isUploaded)
     return (
       <div className="min-h-[300px] flex flex-col items-center justify-center rounded-3xl bg-white/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 shadow-lg backdrop-blur-xl p-10 text-center">
@@ -69,7 +60,6 @@ const ChallengeMode = () => {
       </div>
     );
 
-  /* Results */
   if (showResults && userAnswers.length)
     return (
       <div className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 space-y-6 animate-fade-in">
@@ -95,7 +85,6 @@ const ChallengeMode = () => {
       </div>
     );
 
-  /* Start screen */
   if (!challenges.length)
     return (
       <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-12 space-y-6 max-w-xl mx-auto animate-fade-in">
@@ -107,7 +96,6 @@ const ChallengeMode = () => {
       </div>
     );
 
-  /* Quiz view */
   const q = challenges[currentChallenge];
   const answer = getAnswer();
 
