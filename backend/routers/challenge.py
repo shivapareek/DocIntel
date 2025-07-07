@@ -14,7 +14,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.singleton import quiz_service
+from services.singleton import rag_service, quiz_service
 
 router = APIRouter()
 
