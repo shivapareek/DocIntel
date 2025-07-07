@@ -83,25 +83,33 @@ npm run dev
 ## Folder Structure
 
 ```text
-DocIntel/
+GENAI-DOC-ASSISTANT/
 ├─ backend/
 │  ├─ app/
 │  │  ├─ main.py
 │  │  ├─ services/
-│  │  │   └─ rag.py
-│  │  ├─ auth/
-│  │  │   └─ jwt.py
-│  │  └─ routes/
-│  └─ requirements.txt
+│  │  │   ├─ parser.py
+│  │  │   ├─ quiz.py
+│  │  │   ├─ rag.py
+│  │  │   ├─ singleton.py 
+│  │  │   └─ summary.py
+│  │  ├─ routes/
+│  │  │   ├─ __init__.py
+│  │  │   ├─ challenge.py
+│  │  │   ├─ qa.py
+│  │  │   └─ upload.py
 ├─ frontend/
 │  ├─ src/
 │  │  ├─ components/
-│  │  ├─ pages/
-│  │  └─ context/
-│  ├─ Dockerfile
-│  └─ vite.config.ts
-├─ docs/             # design docs & images
-└─ docker-compose.yml
+│  │  │   ├─ ChallengeMode.jsx
+│  │  │   ├─ ChatInterface.jsx
+│  │  │   ├─ DocumentSummary.jsx 
+│  │  │   └─ DocumentUpload.jsx
+│  │  ├─ context/
+│  │  │   ├─ DocContext.jsx 
+│  │  │   └─ ToastContext.jsx
+|  ├─ vite.config.js
+└─ └─ tailwind.config.js
 ```
 
 ---
