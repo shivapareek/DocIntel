@@ -2,9 +2,10 @@
 
 > AI‑powered document intelligence platform built with **FastAPI**, **React + Tailwind CSS**, and free/open‑source large‑language models. Upload PDFs, get smart summaries, ask questions in Hinglish/English, and practise with auto‑generated quizzes
 
-> ## 📽 Demo
+## 📽 Demo
 
-[![Watch the demo](https://drive.google.com/file/d/1b3IHFdJCqnoo1z4oUF-w3sZRXi9cnNJb/view?usp=drive_link)
+[![Watch Demo Video](https://img.shields.io/badge/▶️ Watch%20Demo%20Video-blue?logo=google-drive)](https://drive.google.com/file/d/1b3IHFdJCqnoo1z4oUF-w3sZRXi9cnNJb/view?usp=drive_link)
+
  
 
 
