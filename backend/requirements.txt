@@ -13,15 +13,11 @@ requests
 
 # Optional LLM tools
 sentence-transformers
-openai
 llama-cpp-python
 
 # File & data handling
 numpy
 pandas
-
-# If using Gemini (only if applicable)
-google-generativeai
 
 # CORS support
 aiofiles
