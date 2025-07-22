@@ -1,23 +1,12 @@
-fastapi
-uvicorn[standard]
-python-multipart
-
-pymupdf
-pdfplumber
-
-langchain
-llama-index
-tqdm
-pydantic
-requests
-
-# Optional LLM tools
-sentence-transformers
-llama-cpp-python
-
-# File & data handling
-numpy
-pandas
-
-# CORS support
-aiofiles
+chromadb==1.0.15
+fastapi==0.116.1
+fitz==0.0.1.dev2
+langchain==0.3.26
+langchain_huggingface==0.3.1
+pdfplumber==0.11.7
+pydantic==2.11.7
+python-dotenv==1.1.1
+Requests==2.32.4
+torch==2.7.1
+transformers==4.53.3
+uvicorn==0.35.0
